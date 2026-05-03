@@ -1,0 +1,4 @@
+﻿PySide6
+docx2pdf
+PyMuPDF
+pyinstaller
