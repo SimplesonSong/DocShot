@@ -1,0 +1,46 @@
+# PyInstaller build outputs
+build/
+dist/
+dist_v2/
+*.spec.bak
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Output files
+output/
+*.pdf
+*.docx
+*.png
+*.jpg
+*.jpeg
+
+# PaddleOCR / model cache
+.paddleocr/
+*.onnx
+*.pdmodel
+*.pdiparams
+*.pdparams
+*.pdopt
