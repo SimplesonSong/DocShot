@@ -13,24 +13,32 @@ from PyInstaller.utils.hooks import (
 )
 
 block_cipher = None
+
 PROJECT_DIR = Path(os.getcwd()).resolve()
+ASSETS_DIR = PROJECT_DIR / "assets"
+ICON_PATH = ASSETS_DIR / "icon.png"
+
+if not ICON_PATH.exists():
+    raise FileNotFoundError(f"找不到图标文件：{ICON_PATH}")
 
 datas = []
 binaries = []
 hiddenimports = []
 
 # =========================
-# 基础资源文件
+# 项目资源文件
 # =========================
-assets_dir = PROJECT_DIR / "assets"
-if assets_dir.exists():
-    datas.append((str(assets_dir), "assets"))
+
+if ASSETS_DIR.exists():
+    datas.append((str(ASSETS_DIR), "assets"))
 
 # =========================
 # Python 3.13 imghdr 兼容
-# =========================
-# 如果你使用 Python 3.13，请先执行：
+# 如果你使用 Python 3.13，需要先执行：
 # python -m pip install standard-imghdr
+# 但更推荐 Python 3.10 / 3.11
+# =========================
+
 hiddenimports += [
     "imghdr",
 ]
@@ -41,12 +49,13 @@ try:
     imghdr_file = getattr(imghdr, "__file__", None)
     if imghdr_file and os.path.exists(imghdr_file):
         datas.append((imghdr_file, "."))
-except Exception:
-    pass
+except Exception as e:
+    print(f"[WARN] imghdr collect failed: {e}")
 
 # =========================
-# 需要完整收集的重型依赖
+# 需要完整收集的依赖包
 # =========================
+
 collect_packages = [
     "Cython",
     "paddle",
@@ -71,22 +80,25 @@ collect_packages = [
 
 for package in collect_packages:
     try:
-        pkg_datas, pkg_binaries, pkg_hiddenimports = collect_all(package)
-        datas += pkg_datas
-        binaries += pkg_binaries
-        hiddenimports += pkg_hiddenimports
+        package_datas, package_binaries, package_hiddenimports = collect_all(package)
+        datas += package_datas
+        binaries += package_binaries
+        hiddenimports += package_hiddenimports
     except Exception as e:
         print(f"[WARN] collect_all failed for {package}: {e}")
 
 # =========================
-# 额外收集 Cython Utility
-# 解决 _internal\Cython\Utility\CppSupport.cpp 缺失问题
+# Cython Utility
+# 解决：
+# _internal\\Cython\\Utility\\CppSupport.cpp 缺失
 # =========================
+
 try:
     import Cython
 
     cython_dir = Path(Cython.__file__).resolve().parent
     cython_utility_dir = cython_dir / "Utility"
+
     if cython_utility_dir.exists():
         datas.append((str(cython_utility_dir), "Cython/Utility"))
 except Exception as e:
@@ -99,8 +111,10 @@ except Exception as e:
     print(f"[WARN] failed to collect Cython data/submodules: {e}")
 
 # =========================
-# package metadata
-# 解决 No package metadata was found for imageio
+# 补充包元数据
+# 解决：
+# No package metadata was found for imageio
+# No package metadata was found for xxx
 # =========================
 
 metadata_packages = [
@@ -109,6 +123,20 @@ metadata_packages = [
     "paddleocr",
     "paddlepaddle",
     "paddlex",
+    "Pillow",
+    "opencv-python",
+    "numpy",
+    "scipy",
+    "scikit-image",
+    "PyMuPDF",
+    "pdf2docx",
+    "python-docx",
+    "lxml",
+    "beautifulsoup4",
+    "openpyxl",
+    "apted",
+    "premailer",
+    "standard-imghdr",
 ]
 
 for package in metadata_packages:
@@ -118,13 +146,25 @@ for package in metadata_packages:
         print(f"[WARN] copy_metadata failed for {package}: {e}")
 
 # =========================
-# Paddle / PaddleOCR 额外隐藏导入
+# Paddle / PaddleOCR 隐藏导入
 # =========================
+
 extra_hiddenimports = [
+    "imghdr",
+    "imageio",
+    "imageio.v2",
+    "imageio_ffmpeg",
+
     "paddle",
     "paddle.base",
     "paddle.framework",
     "paddle.utils",
+    "paddle.nn",
+    "paddle.nn.functional",
+    "paddle.io",
+    "paddle.static",
+    "paddle.inference",
+
     "paddleocr",
     "paddleocr.paddleocr",
     "paddleocr.tools",
@@ -133,33 +173,42 @@ extra_hiddenimports = [
     "paddleocr.ppocr.modeling",
     "paddleocr.ppocr.postprocess",
     "paddleocr.ppocr.utils",
+    "paddleocr.ppocr.utils.logging",
     "paddleocr.ppstructure",
     "paddleocr.ppstructure.table",
     "paddleocr.ppstructure.layout",
+    "paddleocr.ppstructure.recovery",
+
     "paddlex",
+
     "cv2",
     "PIL",
     "PIL.Image",
     "PIL.ImageFile",
+    "PIL.ImageQt",
+
     "numpy",
+    "scipy",
+    "skimage",
+
     "fitz",
     "docx",
     "pdf2docx",
+
     "lxml",
     "lxml.etree",
     "bs4",
+    "openpyxl",
     "apted",
     "premailer",
-    "openpyxl",
-    "imageio",
-    "imageio.v2",
-    "imageio_ffmpeg",
 ]
+
 hiddenimports += extra_hiddenimports
 
 # =========================
 # 动态库补充
 # =========================
+
 dynamic_lib_packages = [
     "paddle",
     "cv2",
@@ -173,33 +222,10 @@ for package in dynamic_lib_packages:
     except Exception as e:
         print(f"[WARN] collect_dynamic_libs failed for {package}: {e}")
 
-
 # =========================
-# 补充包元数据
-# 解决 No package metadata was found for imageio 等问题
+# 去重函数
 # =========================
 
-metadata_packages = [
-    "imageio",
-    "imageio-ffmpeg",
-    "paddleocr",
-    "paddlepaddle",
-    "paddlex",
-    "Pillow",
-    "opencv-python",
-    "numpy",
-    "scipy",
-]
-
-for package in metadata_packages:
-    try:
-        datas += copy_metadata(package)
-    except Exception as e:
-        print(f"[WARN] copy_metadata failed for {package}: {e}")
-
-# =========================
-# 去重
-# =========================
 def unique_list(items):
     seen = set()
     result = []
@@ -218,6 +244,7 @@ hiddenimports = sorted(set(hiddenimports))
 # =========================
 # Analysis
 # =========================
+
 a = Analysis(
     ["main.py"],
     pathex=[str(PROJECT_DIR)],
@@ -246,38 +273,33 @@ pyz = PYZ(
     cipher=block_cipher,
 )
 
+# =========================
+# 单文件模式 EXE
+# 注意：
+# 1. 单文件模式不要使用 COLLECT
+# 2. 不要使用 exclude_binaries=True
+# 3. 必须把 a.binaries / a.zipfiles / a.datas 放进 EXE
+# =========================
+
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
     [],
-    exclude_binaries=True,
     name="DocShot",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
+    upx_exclude=[],
+    runtime_tmpdir=None,
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=(
-        str(assets_dir / "icon.ico")
-        if (assets_dir / "icon.ico").exists()
-        else str(assets_dir / "icon.png")
-        if (assets_dir / "icon.png").exists()
-        else None
-    ),
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=False,
-    upx_exclude=[],
-    name="DocShot",
+    icon=str(ICON_PATH),
 )
